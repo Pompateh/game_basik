@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Enhanced Doodle Jump HTML Game</title>
+  <meta charset="UTF-8">
+  <style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: linear-gradient(to top, #f5f6fa, #e0e6f7 80%, #c9d6ff);
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  canvas {
+    border: 2px solid #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    display: block;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 1;
+  }
+  
+  #score {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    font-family: 'Baloo 2', 'Comic Sans MS', cursive, sans-serif;
+    font-size: 24px;
+    z-index: 999;
+    text-shadow: 1px 1px 4px #000;
+  }
+  #highscore {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    color: #ffd700;
+    font-family: 'Baloo 2', 'Comic Sans MS', cursive, sans-serif;
+    font-size: 20px;
+    z-index: 999;
+    text-shadow: 1px 1px 4px #000;
+  }
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0; width: 100vw; height: 100vh;
+    background: rgba(245,246,250,0.92);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    transition: background 0.5s;
+  }
+  .modal.active {
+    display: flex;
+  }
+  .modal-content {
+    background: #fff;
+    color: #222;
+    padding: 40px 48px 32px 48px;
+    border-radius: 32px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+    text-align: center;
+    min-width: 320px;
+    font-family: 'Baloo 2', 'Comic Sans MS', cursive, sans-serif;
+    position: relative;
+    overflow: visible;
+    z-index: 1001;
+  }
+  .modal-content h2 {
+    font-size: 2.7rem;
+    margin: 0 0 12px 0;
+    color: #ffb300;
+    letter-spacing: 1px;
+    font-family: inherit;
+    text-shadow: 0 2px 8px #ffe08244;
+  }
+  .modal-content p {
+    font-size: 1.3rem;
+    color: #444;
+    margin: 0 0 10px 0;
+    font-family: inherit;
+  }
+  .modal-content .score-label {
+    font-size: 1.1rem;
+    color: #888;
+    margin-bottom: 0;
+    margin-top: 10px;
+  }
+  .modal-content .score-value {
+    font-size: 2.1rem;
+    color: #2a5298;
+    font-weight: bold;
+    margin-bottom: 8px;
+    margin-top: 0;
+    font-family: inherit;
+  }
+  .modal-content button {
+    margin-top: 24px;
+    padding: 16px 48px;
+    font-size: 2rem;
+    border: none;
+    border-radius: 24px;
+    background: #ffd700;
+    color: #222;
+    font-family: inherit;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+    transition: background 0.2s, color 0.2s, transform 0.18s;
+    animation: btnPop 1.2s infinite alternate;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .modal-content button:hover {
+    background: #ffb300;
+    color: #fff;
+    transform: scale(1.08) rotate(-2deg);
+    animation: btnBounce 0.4s;
+  }
+  .modal-content .home-btn {
+    background: #fff;
+    color: #2a5298;
+    border: 2.5px solid #2a5298;
+    margin-top: 16px;
+    font-size: 1.3rem;
+    padding: 12px 36px;
+    border-radius: 18px;
+    font-weight: bold;
+    box-shadow: 0 2px 12px rgba(42,82,152,0.08);
+    animation: btnPop 1.2s infinite alternate;
+    transition: background 0.2s, color 0.2s, border 0.2s, transform 0.18s;
+  }
+  .modal-content .home-btn:hover {
+    background: #2a5298;
+    color: #fff;
+    border-color: #ffb300;
+    transform: scale(1.08) rotate(2deg);
+    animation: btnBounce 0.4s;
+  }
+  @keyframes btnPop {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.04); }
+  }
+  @keyframes btnBounce {
+    0% { transform: scale(1.08) rotate(-2deg); }
+    50% { transform: scale(1.13) rotate(2deg); }
+    100% { transform: scale(1.08) rotate(-2deg); }
+  }
+  /* Floating dot in modal for fun */
+  .modal-dot {
+    position: absolute;
+    left: 18px;
+    top: -28px;
+    width: 32px;
+    height: 32px;
+    background: #ffd700;
+    border-radius: 50%;
+    opacity: 0.22;
+    animation: modalDotFloat 2.2s ease-in-out infinite;
+    z-index: 1;
+  }
+  @keyframes modalDotFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  /* Copyright footer */
+  .footer-copyright {
+    position: fixed;
+    left: 18px;
+    bottom: 18px;
+    color: #2a5298;
+    font-size: 1.35rem;
+    font-family: 'Baloo 2', 'Comic Sans MS', cursive, sans-serif;
+    opacity: 0.92;
+    z-index: 1200;
+    pointer-events: none;
+    user-select: none;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 8px #ffe08233;
+  }
+  /* Logo and doodle images */
+  .logo-img {
+    width: 220px;
+    margin-bottom: 18px;
+    filter: drop-shadow(0 4px 16px rgba(0,0,0,0.10));
+    animation: logoFloat 3.5s ease-in-out infinite;
+  }
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-18px); }
+  }
+  .doodle-img {
+    position: absolute;
+    z-index: 1001;
+    pointer-events: none;
+    opacity: 0.93;
+  }
+  .doodle-2 { left: 8vw; top: 18vh; width: 90px; animation: doodleFloat1 4.2s ease-in-out infinite; }
+  .doodle-4 { right: 10vw; top: 12vh; width: 80px; animation: doodleFloat2 3.7s ease-in-out infinite; }
+  .doodle-6 { left: 18vw; bottom: 10vh; width: 70px; animation: doodleFloat3 4.8s ease-in-out infinite; }
+  .doodle-11 { right: 16vw; bottom: 14vh; width: 100px; animation: doodleFloat4 4.1s ease-in-out infinite; }
+  .doodle-15 { left: 50vw; top: 8vh; width: 60px; animation: doodleFloat5 3.9s ease-in-out infinite; }
+  @keyframes doodleFloat1 { 0%,100%{transform:translateY(0) rotate(-2deg);} 50%{transform:translateY(-18px) rotate(4deg);} }
+  @keyframes doodleFloat2 { 0%,100%{transform:translateY(0) rotate(2deg);} 50%{transform:translateY(-12px) rotate(-3deg);} }
+  @keyframes doodleFloat3 { 0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-10px) rotate(6deg);} }
+  @keyframes doodleFloat4 { 0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-16px) rotate(-5deg);} }
+  @keyframes doodleFloat5 { 0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-8px) rotate(7deg);} }
+  /* Animated background dots */
+  .bg-dot {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.18;
+    z-index: 0;
+    pointer-events: none;
+    animation: dotFloat 7s ease-in-out infinite;
+  }
+  .bg-dot1 { width: 80px; height: 80px; left: 12vw; top: 10vh; background: #ffd700; animation-delay: 0s; }
+  .bg-dot2 { width: 60px; height: 60px; right: 18vw; top: 22vh; background: #ffb300; animation-delay: 1.2s; }
+  .bg-dot3 { width: 100px; height: 100px; left: 30vw; bottom: 8vh; background: #4caf50; animation-delay: 2.1s; }
+  .bg-dot4 { width: 50px; height: 50px; right: 30vw; bottom: 16vh; background: #2a5298; animation-delay: 3.3s; }
+  .bg-dot5 { width: 70px; height: 70px; left: 60vw; top: 18vh; background: #ff5252; animation-delay: 4.5s; }
+  @keyframes dotFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-18px); }
+  }
+  /* Animated rocket */
+  #rocketContainer {
+    position: absolute;
+    z-index: 900;
+    left: 0; top: 0; width: 100vw; height: 100vh;
+    pointer-events: none;
+  }
+  .rocket-fun-group {
+    position: absolute;
+    z-index: 900;
+    left: 10vw;
+    top: 30vh;
+    width: 120px;
+    height: 80px;
+    transition: transform 2.2s cubic-bezier(.77,0,.18,1), left 2.2s cubic-bezier(.77,0,.18,1), top 2.2s cubic-bezier(.77,0,.18,1);
+    will-change: transform, left, top;
+    pointer-events: none;
+    filter: drop-shadow(0 8px 18px rgba(42,82,152,0.13));
+    display: flex;
+    align-items: flex-start;
+  }
+  .rocket-fun {
+    width: 120px;
+    height: 80px;
+    display: block;
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .rocket-flame {
+    position: absolute;
+    left: -22px;
+    top: 54px;
+    width: 32px;
+    height: 24px;
+    z-index: 0;
+    pointer-events: none;
+    animation: flameFlicker 0.4s infinite alternate;
+  }
+  @keyframes flameFlicker {
+    0% { opacity: 0.7; transform: scaleY(1) scaleX(1); }
+    100% { opacity: 1; transform: scaleY(1.2) scaleX(1.1) translateY(-2px); }
+  }
+  /* Platform colors */
+  .platform-yellow { background: #ffd700; }
+  .platform-orange { background: #ffb300; }
+  .platform-green { background: #4caf50; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="score">Score: 0</div>
+<div id="highscore">High Score: 0</div>
+<canvas id="game"></canvas>
+<!-- Animated background dots (always present) -->
+<div class="bg-dot bg-dot1"></div>
+<div class="bg-dot bg-dot2"></div>
+<div class="bg-dot bg-dot3"></div>
+<div class="bg-dot bg-dot4"></div>
+<div class="bg-dot bg-dot5"></div>
+<!-- Start Modal with logo and doodles -->
+<div id="startModal" class="modal active">
+  <div class="modal-content" style="background:rgba(255,255,255,0.97);box-shadow:0 8px 32px rgba(0,0,0,0.10);">
+    <img src="assets/Layer_1.png" alt="Logo" class="logo-img">
+    <h2 style="font-family:'Baloo 2',cursive;font-size:2.5rem;margin:0 0 10px 0;letter-spacing:1px;color:#2a5298;">Doodle Jump</h2>
+    <p style="font-size:1.2rem;color:#444;margin-bottom:18px;">Use your mouse to move left/right.<br>Jump on platforms and avoid falling!</p>
+    <button id="startBtn">Start</button>
+  </div>
+  <div id="rocketContainer">
+    <div id="rocketFunGroup" class="rocket-fun-group">
+      <img src="assets/Layer 2.png" id="rocketFun" class="rocket-fun" alt="rocket">
+      <svg class="rocket-flame" viewBox="0 0 32 24">
+        <ellipse cx="16" cy="12" rx="10" ry="6" fill="#ff5252"/>
+        <ellipse cx="16" cy="16" rx="6" ry="3" fill="#ffd700"/>
+      </svg>
+    </div>
+  </div>
+  <img src="assets/Layer 2.png" class="doodle-img doodle-2" alt="doodle2">
+  <img src="assets/Layer 4.png" class="doodle-img doodle-4" alt="doodle4">
+  <img src="assets/Layer 6.png" class="doodle-img doodle-6" alt="doodle6">
+  <img src="assets/Layer 11.png" class="doodle-img doodle-11" alt="doodle11">
+  <img src="assets/Layer 15.png" class="doodle-img doodle-15" alt="doodle15">
+</div>
+<div id="gameOverModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-dot"></div>
+    <h2>Game Over!</h2>
+    <div class="score-label">Your Score</div>
+    <div class="score-value" id="finalScore">0</div>
+    <div class="score-label">High Score</div>
+    <div class="score-value" id="finalHighScore">0</div>
+    <button id="okBtn">OK</button>
+    <button id="homeBtn" class="home-btn">Back to Home</button>
+  </div>
+</div>
+<div class="footer-copyright">(c) 2025 Newstalgia All Rights Reserved</div>
+<script>
+const canvas = document.getElementById('game');
+const context = canvas.getContext('2d');
+const scoreDisplay = document.getElementById('score');
+const highscoreDisplay = document.getElementById('highscore');
+const startModal = document.getElementById('startModal');
+const startBtn = document.getElementById('startBtn');
+const gameOverModal = document.getElementById('gameOverModal');
+const okBtn = document.getElementById('okBtn');
+const finalScore = document.getElementById('finalScore');
+const finalHighScore = document.getElementById('finalHighScore');
+const homeBtn = document.getElementById('homeBtn');
+const rocketGroup = document.getElementById('rocketFunGroup');
+const rocketContainer = document.getElementById('rocketContainer');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const platformWidth = 110;
+const platformHeight = 32;
+const platformStart = () => canvas.height - 50;
+
+const gravity = 0.33;
+const drag = 0.3;
+const bounceVelocity = -12.5;
+
+let minPlatformSpace = 15;
+let maxPlatformSpace = 20;
+
+let score = 0;
+let highscore = parseInt(localStorage.getItem('doodleHighScore') || '0');
+highscoreDisplay.textContent = 'High Score: ' + highscore;
+
+const platformColors = ['#ffd700', '#ffb300', '#4caf50'];
+const fragilePlatformColor = '#ffb3b3';
+
+function randomPlatformColor(type) {
+  if (type === 'fragile') return fragilePlatformColor;
+  return platformColors[Math.floor(Math.random() * platformColors.length)];
+}
+
+function random(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function createInitialPlatforms() {
+  let platforms = [{
+    x: canvas.width / 2 - platformWidth / 2,
+    y: platformStart(),
+    type: 'normal',
+    broken: false,
+    crackAnim: 0,
+    color: randomPlatformColor('normal'),
+    moveDir: 0,
+    moveRange: 0,
+    moveBase: 0
+  }];
+  let y = platformStart();
+  while (y > 0) {
+    y -= platformHeight + random(minPlatformSpace, maxPlatformSpace);
+    let x;
+    do {
+      x = random(25, canvas.width - 25 - platformWidth);
+    } while (
+      y > canvas.height / 2 &&
+      x > canvas.width / 2 - platformWidth * 1.5 &&
+      x < canvas.width / 2 + platformWidth / 2
+    );
+    let rand = Math.random();
+    let type = rand < 0.2 ? 'fragile' : (rand < 0.35 ? 'moving' : 'normal');
+    let moveDir = 0, moveRange = 0, moveBase = x;
+    if (type === 'moving') {
+      moveDir = Math.random() > 0.5 ? 1 : -1;
+      moveRange = 60 + Math.random() * 60;
+      moveBase = x;
+    }
+    platforms.push({ x, y, type, broken: false, crackAnim: 0, color: randomPlatformColor(type), moveDir, moveRange, moveBase, blobSeed: Math.random() });
+  }
+  return platforms;
+}
+
+let platforms;
+let doodle;
+let prevDoodleY;
+let mouseX;
+let running = false;
+let dying = false;
+let deathAnim = 0;
+let rocketFlying = true;
+let rocketTimeout;
+
+// Obstacles
+let obstacles = [];
+function spawnObstacle(y) {
+  // Obstacles are moving horizontally
+  const size = 38;
+  const speed = 1.5 + Math.random() * 1.5;
+  const leftToRight = Math.random() > 0.5;
+  obstacles.push({
+    x: leftToRight ? -size : canvas.width + size,
+    y,
+    size,
+    speed: leftToRight ? speed : -speed,
+    leftToRight
+  });
+}
+
+function drawObstacle(ob) {
+  // Draw a simple moving enemy (e.g., red ball with eyes)
+  context.save();
+  context.beginPath();
+  context.arc(ob.x, ob.y, ob.size/2, 0, Math.PI*2);
+  context.fillStyle = '#ff5252';
+  context.shadowColor = '#ff5252';
+  context.shadowBlur = 24;
+  context.globalAlpha = 0.98;
+  context.fill();
+  context.globalAlpha = 1;
+  context.lineWidth = 4;
+  context.strokeStyle = '#222';
+  context.stroke();
+  context.shadowBlur = 0;
+  // Eyes
+  context.shadowBlur = 0;
+  context.fillStyle = '#fff';
+  context.beginPath();
+  context.arc(ob.x-7, ob.y-4, 4, 0, Math.PI*2);
+  context.arc(ob.x+7, ob.y-4, 4, 0, Math.PI*2);
+  context.fill();
+  context.fillStyle = '#222';
+  context.beginPath();
+  context.arc(ob.x-7, ob.y-4, 2, 0, Math.PI*2);
+  context.arc(ob.x+7, ob.y-4, 2, 0, Math.PI*2);
+  context.fill();
+  context.restore();
+}
+
+function resetGame() {
+  minPlatformSpace = 15;
+  maxPlatformSpace = 20;
+  score = 0;
+  scoreDisplay.textContent = 'Score: 0';
+  highscoreDisplay.textContent = 'High Score: ' + highscore;
+  platforms = createInitialPlatforms();
+  doodle = {
+    width: 40,
+    height: 60,
+    x: canvas.width / 2 - 20,
+    y: platformStart() - 60,
+    dx: 0,
+    dy: 0,
+  };
+  prevDoodleY = doodle.y;
+  mouseX = canvas.width / 2;
+  dying = false;
+  deathAnim = 0;
+}
+
+canvas.addEventListener('mousemove', function(e) {
+  mouseX = e.clientX;
+});
+
+function drawDoodle(x, y, dead = false) {
+  // Cute astronaut doodle with helmet and jetpack
+  context.save();
+  context.translate(x + doodle.width/2, y + doodle.height/2);
+  if (dead) {
+    context.rotate(Math.PI/2 * Math.min(1, deathAnim/20));
+  }
+  // Jetpack fire
+  if (!dead && doodle.dy < 0) {
+    context.save();
+    context.translate(0, doodle.height/2-6);
+    context.rotate(Math.random()*0.2-0.1);
+    context.beginPath();
+    context.ellipse(0, 10, 7, 14, 0, 0, Math.PI*2);
+    context.fillStyle = '#ffd700';
+    context.globalAlpha = 0.7;
+    context.fill();
+    context.globalAlpha = 1;
+    context.restore();
+  }
+  // Body
+  context.fillStyle = dead ? '#eee' : '#fff';
+  context.beginPath();
+  context.ellipse(0, 10, 15, 22, 0, 0, Math.PI*2);
+  context.fill();
+  // Face
+  context.save();
+  context.beginPath();
+  context.arc(0, -10, 18, 0, Math.PI*2);
+  context.fillStyle = '#fff';
+  context.shadowColor = '#b3e5fc';
+  context.shadowBlur = 8;
+  context.fill();
+  context.shadowBlur = 0;
+  // Visor
+  context.beginPath();
+  context.arc(0, -10, 16, 0.2*Math.PI, 0.8*Math.PI);
+  context.lineWidth = 4;
+  context.strokeStyle = '#b3e5fc';
+  context.stroke();
+  // Eyes
+  context.fillStyle = '#222';
+  context.beginPath();
+  if (dead) {
+    context.moveTo(-7, -15); context.lineTo(-2, -10);
+    context.moveTo(-2, -15); context.lineTo(-7, -10);
+    context.moveTo(7, -15); context.lineTo(2, -10);
+    context.moveTo(2, -15); context.lineTo(7, -10);
+    context.lineWidth = 2;
+    context.stroke();
+  } else {
+    context.arc(-5, -13, 2.5, 0, Math.PI*2);
+    context.arc(5, -13, 2.5, 0, Math.PI*2);
+    context.fill();
+    // Smile
+    context.strokeStyle = '#222';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(0, -7, 7, 0.2*Math.PI, 0.8*Math.PI);
+    context.stroke();
+  }
+  context.restore();
+  context.restore();
+}
+
+function loop() {
+  if (!running) return;
+  requestAnimationFrame(loop);
+  context.clearRect(0,0,canvas.width,canvas.height);
+
+  // Increase difficulty
+  let difficulty = Math.min(1 + score/800, 2.5);
+  minPlatformSpace = 15 * difficulty;
+  maxPlatformSpace = 20 * difficulty;
+
+  // Obstacles spawn after score 300
+  if (score > 300 && Math.random() < 0.012 * difficulty) {
+    let topY = platforms[platforms.length-1]?.y || 0;
+    spawnObstacle(topY - 120);
+  }
+
+  // Move obstacles
+  obstacles.forEach(ob => {
+    ob.x += ob.speed;
+    if (ob.x < -ob.size-20 || ob.x > canvas.width+ob.size+20) ob.remove = true;
+  });
+  obstacles = obstacles.filter(ob => !ob.remove);
+
+  if (!dying) {
+    doodle.dy += gravity;
+    let targetX = mouseX - doodle.width/2;
+    doodle.x += (targetX - doodle.x) * 0.18;
+    if (doodle.x + doodle.width < 0) {
+      doodle.x = canvas.width;
+    } else if (doodle.x > canvas.width) {
+      doodle.x = -doodle.width;
+    }
+  }
+
+  if (doodle.y < canvas.height / 2 && doodle.dy < 0 && !dying) {
+    platforms.forEach(platform => {
+      platform.y += -doodle.dy;
+    });
+    obstacles.forEach(ob => { ob.y += -doodle.dy; });
+    while (platforms[platforms.length - 1].y > 0) {
+      let type = Math.random() < 0.2 ? 'fragile' : 'normal';
+      platforms.push({
+        x: random(25, canvas.width - 25 - platformWidth),
+        y: platforms[platforms.length - 1].y - (platformHeight + random(minPlatformSpace, maxPlatformSpace)),
+        type,
+        broken: false,
+        crackAnim: 0,
+        color: randomPlatformColor(type)
+      });
+      minPlatformSpace += 0.5;
+      maxPlatformSpace += 0.5;
+      maxPlatformSpace = Math.min(maxPlatformSpace, canvas.height / 2);
+      score += 10;
+      scoreDisplay.textContent = 'Score: ' + score;
+    }
+  } else if (!dying) {
+    doodle.y += doodle.dy;
+  }
+
+  // Draw platforms
+  platforms.forEach(platform => {
+    context.save();
+    if (platform.type === 'moving' && !platform.broken) {
+      let t = Date.now() / 900;
+      platform.x = platform.moveBase + Math.sin(t * platform.moveDir) * platform.moveRange;
+    }
+    let cx = platform.x + platformWidth/2;
+    let cy = platform.y + platformHeight/2;
+    let w = platformWidth/2, h = platformHeight/2;
+    let seed = platform.blobSeed || 0;
+    context.beginPath();
+    for (let i = 0; i <= 20; i++) {
+      let angle = (i/20) * Math.PI * 2;
+      let r = 1 + 0.13 * Math.sin(angle*3 + seed*10) + 0.09 * Math.cos(angle*5 + seed*20);
+      let px = cx + Math.cos(angle) * w * r;
+      let py = cy + Math.sin(angle) * h * r;
+      if (i === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.closePath();
+    context.shadowColor = platform.color;
+    context.shadowBlur = 22;
+    context.fillStyle = platform.color;
+    context.globalAlpha = 0.98;
+    context.fill();
+    context.globalAlpha = 1;
+    context.lineWidth = 4;
+    context.strokeStyle = platform.type === 'fragile' ? '#e53935' : '#222';
+    context.setLineDash(platform.type === 'fragile' ? [8, 7] : []);
+    context.stroke();
+    context.setLineDash([]);
+    context.shadowBlur = 0;
+    if (platform.type === 'fragile') {
+      context.save();
+      context.strokeStyle = '#e53935';
+      context.lineWidth = 3.5;
+      context.beginPath();
+      let crackY = cy;
+      let crackX = cx - w * 0.7;
+      for (let j = 0; j < 7; j++) {
+        context.lineTo(crackX + j * w * 0.2, crackY + ((j%2===0)?-7:7));
+      }
+      context.stroke();
+      context.restore();
+    }
+    context.restore();
+  });
+
+  // Draw obstacles
+  obstacles.forEach(drawObstacle);
+
+  // Platform collision
+  if (!dying) {
+    platforms.forEach(platform => {
+      if (
+        !platform.broken &&
+        doodle.dy > 0 &&
+        prevDoodleY + doodle.height <= platform.y &&
+        doodle.x < platform.x + platformWidth &&
+        doodle.x + doodle.width > platform.x &&
+        doodle.y < platform.y + platformHeight &&
+        doodle.y + doodle.height > platform.y
+      ) {
+        if (platform.type === 'fragile') {
+          platform.broken = true;
+          platform.crackAnim = 1;
+          setTimeout(() => {
+            platforms = platforms.filter(p => p !== platform);
+          }, 250);
+        } else {
+          doodle.y = platform.y - doodle.height;
+          doodle.dy = bounceVelocity;
+        }
+      }
+    });
+    // Obstacle collision
+    obstacles.forEach(ob => {
+      let dx = (doodle.x + doodle.width/2) - ob.x;
+      let dy = (doodle.y + doodle.height/2) - ob.y;
+      let dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < ob.size/2 + Math.min(doodle.width, doodle.height)/2 - 4) {
+        dying = true;
+        deathAnim = 0;
+      }
+    });
+  }
+
+  // Animate fragile cracks
+  platforms.forEach(platform => {
+    if (platform.type === 'fragile' && platform.broken && platform.crackAnim < 8) {
+      platform.crackAnim++;
+    }
+  });
+
+  if (dying) {
+    deathAnim++;
+    drawDoodle(doodle.x, doodle.y, true);
+    doodle.y += 10 + deathAnim*0.7;
+    if (doodle.y > canvas.height + 80) {
+      showGameOver();
+    }
+  } else {
+    drawDoodle(doodle.x, doodle.y);
+  }
+
+  prevDoodleY = doodle.y;
+  platforms = platforms.filter(platform => platform.y < canvas.height && !platform.broken);
+
+  if (doodle.y > canvas.height && !dying) {
+    dying = true;
+    deathAnim = 0;
+  }
+}
+
+function showGameOver() {
+  running = false;
+  finalScore.textContent = score;
+  if (score > highscore) {
+    highscore = score;
+    localStorage.setItem('doodleHighScore', highscore);
+    finalHighScore.textContent = highscore + ' (New!)';
+  } else {
+    finalHighScore.textContent = highscore;
+  }
+  gameOverModal.classList.add('active');
+}
+
+okBtn.onclick = function() {
+  gameOverModal.classList.remove('active');
+  resetGame();
+  setTimeout(() => {
+    running = true;
+    requestAnimationFrame(loop);
+  }, 200);
+};
+
+homeBtn.onclick = function() {
+  gameOverModal.classList.remove('active');
+  document.querySelectorAll('.doodle-img').forEach(img => img.style.display = '' );
+  startModal.classList.add('active');
+  rocketFlying = true;
+  rocketContainer.style.display = '';
+  animateRocket();
+  resetGame();
+};
+
+startBtn.onclick = function() {
+  startModal.classList.remove('active');
+  document.querySelectorAll('.doodle-img').forEach(img => img.style.display = 'none');
+  rocketFlying = false;
+  rocketContainer.style.display = 'none';
+  clearTimeout(rocketTimeout);
+  resetGame();
+  running = true;
+  requestAnimationFrame(loop);
+};
+
+function randomRocketPos() {
+  // Keep rocket within 10vw-70vw and 10vh-60vh
+  const vw = Math.max(window.innerWidth, 400);
+  const vh = Math.max(window.innerHeight, 400);
+  const left = Math.random() * (vw * 0.6) + vw * 0.1;
+  const top = Math.random() * (vh * 0.4) + vh * 0.1;
+  const angle = Math.random() * 60 - 30; // -30deg to +30deg
+  return { left, top, angle };
+}
+
+function animateRocket() {
+  if (!rocketFlying) return;
+  const { left, top, angle } = randomRocketPos();
+  rocketGroup.style.left = left + 'px';
+  rocketGroup.style.top = top + 'px';
+  rocketGroup.style.transform = `rotate(${angle}deg)`;
+  rocketTimeout = setTimeout(animateRocket, 2200 + Math.random() * 1200);
+}
+
+// Start rocket animation on modal show
+if (startModal.classList.contains('active')) {
+  animateRocket();
+}
+
+// Start with modal
+resetGame();
+</script>
+</body>
+</html>
