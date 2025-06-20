@@ -346,6 +346,24 @@ const homeBtn = document.getElementById('homeBtn');
 const rocketGroup = document.getElementById('rocketFunGroup');
 const rocketContainer = document.getElementById('rocketContainer');
 
+// Cloud type definitions
+const cloudTypes = [
+  { img: 'img/Layer_2.png', width: 200, height: 64 }, // medium (2x)
+  { img: 'img/Layer_3.png', width: 260, height: 88 }, // big (2x)
+  { img: 'img/Layer_4.png', width: 140, height: 44 },  // small (2x)
+  { img: 'img/Layer_5.png', width: 200, height: 64 }, // medium (2x)
+  { img: 'img/Layer_6.png', width: 260, height: 88 }, // big (2x)
+];
+const cloudImgs = cloudTypes.map(type => { const img = new Image(); img.src = type.img; return img; });
+const platformEnemyImg = new Image(); platformEnemyImg.src = 'img/platformenemy.png';
+const enemyImgs = [
+  new Image(),
+  new Image()
+];
+enemyImgs[0].src = 'img/enemy1.png';
+enemyImgs[1].src = 'img/enemy2.png';
+const prizeImg = new Image(); prizeImg.src = 'img/prize1.png';
+
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -380,9 +398,55 @@ function random(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+let platformsGenerated = 0; // Track platforms generated after initial
+
 function createInitialPlatforms() {
-  let platforms = [{
-    x: canvas.width / 2 - platformWidth / 2,
+  let platforms = [];
+  const numPlatforms = 10;
+  let y = platformStart();
+  let lastX = canvas.width / 2; // Start near center
+  let lastType = 'normal';
+  for (let i = 0; i < numPlatforms; i++) {
+    const cloudIdx = Math.floor(Math.random() * cloudTypes.length);
+    const cloudType = cloudTypes[cloudIdx];
+    // Limit horizontal distance
+    let minX = Math.max(25, lastX - canvas.width * 0.6);
+    let maxX = Math.min(canvas.width - 25 - cloudType.width, lastX + canvas.width * 0.6);
+    let x = random(minX, maxX);
+    // Limit vertical gap
+    let maxVertGap = 1.2 * 120; // 120 is approx max jump height
+    if (i > 0) y -= Math.min(cloudType.height + random(minPlatformSpace, maxPlatformSpace), maxVertGap);
+    let type = 'normal';
+    if (i >= 3) {
+      // Prevent two fragile in a row
+      let canBeFragile = lastType !== 'fragile';
+      let r = Math.random();
+      if (canBeFragile && r < 0.2) type = 'fragile';
+      else if (r < 0.4) type = 'moving';
+    }
+    let moveDir = 0, moveRange = 0, moveBase = x;
+    let enemyOffsetY = 0;
+    if (type === 'fragile') {
+      enemyOffsetY = -cloudType.height * (0.7 + Math.random()*0.2);
+    }
+    if (type === 'moving') {
+      moveDir = Math.random() > 0.5 ? 1 : -1;
+      moveRange = 60 + Math.random() * 60;
+      moveBase = x;
+    }
+    platforms.push({
+      x, y, type, broken: false, crackAnim: 0, color: randomPlatformColor(type), moveDir, moveRange, moveBase, blobSeed: Math.random(),
+      cloudIdx,
+      width: cloudType.width,
+      height: cloudType.height,
+      enemyOffsetY
+    });
+    lastX = x;
+    lastType = type;
+  }
+  // Add a starting platform at the bottom center (big cloud)
+  platforms.push({
+    x: canvas.width / 2 - 260/2,
     y: platformStart(),
     type: 'normal',
     broken: false,
@@ -390,29 +454,12 @@ function createInitialPlatforms() {
     color: randomPlatformColor('normal'),
     moveDir: 0,
     moveRange: 0,
-    moveBase: 0
-  }];
-  let y = platformStart();
-  while (y > 0) {
-    y -= platformHeight + random(minPlatformSpace, maxPlatformSpace);
-    let x;
-    do {
-      x = random(25, canvas.width - 25 - platformWidth);
-    } while (
-      y > canvas.height / 2 &&
-      x > canvas.width / 2 - platformWidth * 1.5 &&
-      x < canvas.width / 2 + platformWidth / 2
-    );
-    let rand = Math.random();
-    let type = rand < 0.2 ? 'fragile' : (rand < 0.35 ? 'moving' : 'normal');
-    let moveDir = 0, moveRange = 0, moveBase = x;
-    if (type === 'moving') {
-      moveDir = Math.random() > 0.5 ? 1 : -1;
-      moveRange = 60 + Math.random() * 60;
-      moveBase = x;
-    }
-    platforms.push({ x, y, type, broken: false, crackAnim: 0, color: randomPlatformColor(type), moveDir, moveRange, moveBase, blobSeed: Math.random() });
-  }
+    moveBase: 0,
+    cloudIdx: 1, // Layer_3 big
+    width: 260,
+    height: 88,
+    enemyOffsetY: 0
+  });
   return platforms;
 }
 
@@ -433,43 +480,57 @@ function spawnObstacle(y) {
   const size = 38;
   const speed = 1.5 + Math.random() * 1.5;
   const leftToRight = Math.random() > 0.5;
+  // At higher scores, pick a random enemy type
+  let enemyType = undefined;
+  if (score > 600) {
+    enemyType = Math.random() > 0.5 ? 1 : 0;
+  }
   obstacles.push({
     x: leftToRight ? -size : canvas.width + size,
     y,
     size,
     speed: leftToRight ? speed : -speed,
-    leftToRight
+    leftToRight,
+    enemyType
   });
 }
 
 function drawObstacle(ob) {
-  // Draw a simple moving enemy (e.g., red ball with eyes)
-  context.save();
-  context.beginPath();
-  context.arc(ob.x, ob.y, ob.size/2, 0, Math.PI*2);
-  context.fillStyle = '#ff5252';
-  context.shadowColor = '#ff5252';
-  context.shadowBlur = 24;
-  context.globalAlpha = 0.98;
-  context.fill();
-  context.globalAlpha = 1;
-  context.lineWidth = 4;
-  context.strokeStyle = '#222';
-  context.stroke();
-  context.shadowBlur = 0;
-  // Eyes
-  context.shadowBlur = 0;
-  context.fillStyle = '#fff';
-  context.beginPath();
-  context.arc(ob.x-7, ob.y-4, 4, 0, Math.PI*2);
-  context.arc(ob.x+7, ob.y-4, 4, 0, Math.PI*2);
-  context.fill();
-  context.fillStyle = '#222';
-  context.beginPath();
-  context.arc(ob.x-7, ob.y-4, 2, 0, Math.PI*2);
-  context.arc(ob.x+7, ob.y-4, 2, 0, Math.PI*2);
-  context.fill();
-  context.restore();
+  // At higher scores, use enemy images
+  if (score > 600) {
+    const enemyImg = enemyImgs[ob.enemyType || 0];
+    context.save();
+    context.drawImage(enemyImg, ob.x - ob.size/2, ob.y - ob.size/2, ob.size, ob.size);
+    context.restore();
+  } else {
+    // Draw a simple moving enemy (e.g., red ball with eyes)
+    context.save();
+    context.beginPath();
+    context.arc(ob.x, ob.y, ob.size/2, 0, Math.PI*2);
+    context.fillStyle = '#ff5252';
+    context.shadowColor = '#ff5252';
+    context.shadowBlur = 24;
+    context.globalAlpha = 0.98;
+    context.fill();
+    context.globalAlpha = 1;
+    context.lineWidth = 4;
+    context.strokeStyle = '#222';
+    context.stroke();
+    context.shadowBlur = 0;
+    // Eyes
+    context.shadowBlur = 0;
+    context.fillStyle = '#fff';
+    context.beginPath();
+    context.arc(ob.x-7, ob.y-4, 4, 0, Math.PI*2);
+    context.arc(ob.x+7, ob.y-4, 4, 0, Math.PI*2);
+    context.fill();
+    context.fillStyle = '#222';
+    context.beginPath();
+    context.arc(ob.x-7, ob.y-4, 2, 0, Math.PI*2);
+    context.arc(ob.x+7, ob.y-4, 2, 0, Math.PI*2);
+    context.fill();
+    context.restore();
+  }
 }
 
 function resetGame() {
@@ -479,11 +540,13 @@ function resetGame() {
   scoreDisplay.textContent = 'Score: 0';
   highscoreDisplay.textContent = 'High Score: ' + highscore;
   platforms = createInitialPlatforms();
+  platformsGenerated = 0;
+  const startPlat = platforms[platforms.length-1];
   doodle = {
     width: 40,
     height: 60,
-    x: canvas.width / 2 - 20,
-    y: platformStart() - 60,
+    x: startPlat.x + startPlat.width/2 - 20,
+    y: startPlat.y - 60,
     dx: 0,
     dy: 0,
   };
@@ -596,27 +659,86 @@ function loop() {
     }
   }
 
+  // Remove only platforms far below the screen
+  platforms = platforms.filter(platform => platform.y < canvas.height + 400 && !platform.broken);
+
+  // If all platforms are gone, add one at the player's y
+  if (platforms.length === 0) {
+    const cloudIdx = Math.floor(Math.random() * cloudTypes.length);
+    const cloudType = cloudTypes[cloudIdx];
+    platforms.push({
+      x: doodle.x,
+      y: doodle.y + 100,
+      type: 'normal',
+      broken: false,
+      crackAnim: 0,
+      color: randomPlatformColor('normal'),
+      cloudIdx,
+      width: cloudType.width,
+      height: cloudType.height,
+      enemyOffsetY: 0
+    });
+  }
+
+  // Always ensure at least 5 platforms above the player
+  let platformsAbove = platforms.filter(p => p.y < doodle.y);
+  let countAbove = platformsAbove.length;
+  let minY = platformsAbove.length > 0 ? Math.min(...platformsAbove.map(p => p.y)) : doodle.y;
+  let platformGenCounter = 0;
+  while (countAbove < 5 || minY > -600) {
+    let prevPlat = platforms.length > 0
+      ? platforms.reduce((a, b) => (a.y < b.y ? a : b))
+      : { x: doodle.x, y: doodle.y, type: 'normal' };
+    const cloudIdx = Math.floor(Math.random() * cloudTypes.length);
+    const cloudType = cloudTypes[cloudIdx];
+    // Limit horizontal distance
+    let minX = Math.max(25, prevPlat.x - canvas.width * 0.6);
+    let maxX = Math.min(canvas.width - 25 - cloudType.width, prevPlat.x + canvas.width * 0.6);
+    let x = random(minX, maxX);
+    // Reduce max vertical gap
+    let maxVertGap = 100;
+    let y = prevPlat.y - Math.min(cloudType.height + random(minPlatformSpace, maxPlatformSpace), maxVertGap);
+    // Ensure at least every 2nd platform is normal
+    let type = 'normal';
+    if (platformGenCounter % 2 !== 0 && platformsGenerated >= 12) {
+      let lastType = prevPlat.type || 'normal';
+      let canBeFragile = lastType !== 'fragile';
+      let r = Math.random();
+      if (canBeFragile && r < 0.2) type = 'fragile';
+      else if (r < 0.4) type = 'moving';
+    }
+    let enemyOffsetY = 0;
+    if (type === 'fragile') {
+      enemyOffsetY = -cloudType.height * (0.7 + Math.random()*0.2);
+    }
+    platforms.push({
+      x,
+      y,
+      type,
+      broken: false,
+      crackAnim: 0,
+      color: randomPlatformColor(type),
+      cloudIdx,
+      width: cloudType.width,
+      height: cloudType.height,
+      enemyOffsetY
+    });
+    platformsGenerated++;
+    minPlatformSpace += 0.5;
+    maxPlatformSpace += 0.5;
+    maxPlatformSpace = Math.min(maxPlatformSpace, canvas.height / 2);
+    // Debug logging
+    console.log('Generating platform at y:', y, 'minY:', minY, 'countAbove:', countAbove, 'platforms.length:', platforms.length, 'type:', type);
+    minY = y;
+    countAbove++;
+    platformGenCounter++;
+  }
+
   if (doodle.y < canvas.height / 2 && doodle.dy < 0 && !dying) {
     platforms.forEach(platform => {
       platform.y += -doodle.dy;
     });
     obstacles.forEach(ob => { ob.y += -doodle.dy; });
-    while (platforms[platforms.length - 1].y > 0) {
-      let type = Math.random() < 0.2 ? 'fragile' : 'normal';
-      platforms.push({
-        x: random(25, canvas.width - 25 - platformWidth),
-        y: platforms[platforms.length - 1].y - (platformHeight + random(minPlatformSpace, maxPlatformSpace)),
-        type,
-        broken: false,
-        crackAnim: 0,
-        color: randomPlatformColor(type)
-      });
-      minPlatformSpace += 0.5;
-      maxPlatformSpace += 0.5;
-      maxPlatformSpace = Math.min(maxPlatformSpace, canvas.height / 2);
-      score += 10;
-      scoreDisplay.textContent = 'Score: ' + score;
-    }
   } else if (!dying) {
     doodle.y += doodle.dy;
   }
@@ -628,44 +750,17 @@ function loop() {
       let t = Date.now() / 900;
       platform.x = platform.moveBase + Math.sin(t * platform.moveDir) * platform.moveRange;
     }
-    let cx = platform.x + platformWidth/2;
-    let cy = platform.y + platformHeight/2;
-    let w = platformWidth/2, h = platformHeight/2;
-    let seed = platform.blobSeed || 0;
-    context.beginPath();
-    for (let i = 0; i <= 20; i++) {
-      let angle = (i/20) * Math.PI * 2;
-      let r = 1 + 0.13 * Math.sin(angle*3 + seed*10) + 0.09 * Math.cos(angle*5 + seed*20);
-      let px = cx + Math.cos(angle) * w * r;
-      let py = cy + Math.sin(angle) * h * r;
-      if (i === 0) context.moveTo(px, py);
-      else context.lineTo(px, py);
-    }
-    context.closePath();
-    context.shadowColor = platform.color;
-    context.shadowBlur = 22;
-    context.fillStyle = platform.color;
-    context.globalAlpha = 0.98;
-    context.fill();
+    // Draw cloud image for all platforms (no filter)
+    const img = cloudImgs[platform.cloudIdx] || cloudImgs[0];
+    context.globalAlpha = platform.type === 'fragile' && platform.broken ? 0.5 : 1;
+    context.drawImage(img, platform.x, platform.y, platform.width, platform.height);
     context.globalAlpha = 1;
-    context.lineWidth = 4;
-    context.strokeStyle = platform.type === 'fragile' ? '#e53935' : '#222';
-    context.setLineDash(platform.type === 'fragile' ? [8, 7] : []);
-    context.stroke();
-    context.setLineDash([]);
-    context.shadowBlur = 0;
+    // Fragile overlay
     if (platform.type === 'fragile') {
-      context.save();
-      context.strokeStyle = '#e53935';
-      context.lineWidth = 3.5;
-      context.beginPath();
-      let crackY = cy;
-      let crackX = cx - w * 0.7;
-      for (let j = 0; j < 7; j++) {
-        context.lineTo(crackX + j * w * 0.2, crackY + ((j%2===0)?-7:7));
-      }
-      context.stroke();
-      context.restore();
+      const enemyW = platform.width * 0.9;
+      const enemyH = platform.height * 1.5;
+      const offsetY = platform.enemyOffsetY || 0;
+      context.drawImage(platformEnemyImg, platform.x + (platform.width-enemyW)/2, platform.y + offsetY, enemyW, enemyH);
     }
     context.restore();
   });
@@ -680,9 +775,9 @@ function loop() {
         !platform.broken &&
         doodle.dy > 0 &&
         prevDoodleY + doodle.height <= platform.y &&
-        doodle.x < platform.x + platformWidth &&
+        doodle.x < platform.x + platform.width &&
         doodle.x + doodle.width > platform.x &&
-        doodle.y < platform.y + platformHeight &&
+        doodle.y < platform.y + platform.height &&
         doodle.y + doodle.height > platform.y
       ) {
         if (platform.type === 'fragile') {
@@ -694,6 +789,9 @@ function loop() {
         } else {
           doodle.y = platform.y - doodle.height;
           doodle.dy = bounceVelocity;
+          // Increment score only when landing
+          score += 10;
+          scoreDisplay.textContent = 'Score: ' + score;
         }
       }
     });
@@ -728,11 +826,20 @@ function loop() {
   }
 
   prevDoodleY = doodle.y;
-  platforms = platforms.filter(platform => platform.y < canvas.height && !platform.broken);
+  platforms = platforms.filter(platform => platform.y < canvas.height + 200 && !platform.broken);
 
   if (doodle.y > canvas.height && !dying) {
     dying = true;
     deathAnim = 0;
+  }
+
+  // Draw prize at the top if score >= 3000
+  if (score >= 3000) {
+    const prizeX = canvas.width/2 - 40;
+    const prizeY = 60;
+    context.save();
+    context.drawImage(prizeImg, prizeX, prizeY, 80, 80);
+    context.restore();
   }
 }
 
