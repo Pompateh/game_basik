@@ -315,7 +315,7 @@
   <img src="img/enemy2.png" class="doodle-img doodle-2" alt="doodle2" style="width:129px;">
   <img src="img/platformenemy.png" class="doodle-img doodle-4" alt="doodle4" style="width:120px;">
   <img src="img/prize1.png" class="doodle-img doodle-6" alt="doodle6" style="width:170px;">
-  <img src="img/main.png" class="doodle-img doodle-11" alt="doodle11" style="width:130px;">
+  <img src="img/main.gif" class="doodle-img doodle-11" alt="doodle11" style="width:130px;">
   <img src="img/Layer_6.png" class="doodle-img doodle-15" alt="doodle15" style="width:120px;">
 </div>
 <div id="gameOverModal" class="modal">
@@ -331,6 +331,7 @@
   </div>
 </div>
 <div class="footer-copyright">(c) 2025 Newstalgia All Rights Reserved</div>
+<img id="playerGif" src="img/main.gif" style="display: none; position: absolute; z-index: 2; transform-origin: center;">
 <script>
 const canvas = document.getElementById('game');
 const context = canvas.getContext('2d');
@@ -345,6 +346,15 @@ const finalHighScore = document.getElementById('finalHighScore');
 const homeBtn = document.getElementById('homeBtn');
 const rocketGroup = document.getElementById('rocketFunGroup');
 const rocketContainer = document.getElementById('rocketContainer');
+
+const assetsToLoad = [
+  'img/Layer_2.png', 'img/Layer_3.png', 'img/Layer_4.png', 'img/Layer_5.png', 'img/Layer_6.png',
+  'img/platformenemy.png',
+  'img/enemy1.png', 'img/enemy2.png',
+  'img/prize1.png'
+];
+const images = {};
+let imagesLoaded = 0;
 
 // Cloud type definitions
 const cloudTypes = [
@@ -365,7 +375,53 @@ enemyImgs[1].src = 'img/enemy2.png';
 const prizeImg = new Image(); prizeImg.src = 'img/prize1.png';
 
 // Preload player image
-const playerImg = new Image(); playerImg.src = 'img/main.png';
+const playerImg = document.getElementById('playerGif');
+
+function preloadImages(callback) {
+  startBtn.disabled = true;
+  startBtn.textContent = 'Loading...';
+
+  // Check player GIF
+  let playerGifLoaded = playerImg.complete;
+  if (!playerGifLoaded) {
+    playerImg.onload = () => {
+      playerGifLoaded = true;
+      checkAllLoaded();
+    };
+  }
+
+  if (assetsToLoad.length === 0) {
+      checkAllLoaded();
+      return;
+  }
+  
+  assetsToLoad.forEach(src => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+      imagesLoaded++;
+      images[src] = img;
+      checkAllLoaded();
+    };
+    img.onerror = () => console.error('Failed to load image:', src);
+  });
+
+  function checkAllLoaded() {
+    if (playerGifLoaded && imagesLoaded === assetsToLoad.length) {
+      // Assign preloaded images
+      platformEnemyImg.src = 'img/platformenemy.png'; // will be drawn from cache
+      enemyImgs[0].src = 'img/enemy1.png';
+      enemyImgs[1].src = 'img/enemy2.png';
+      prizeImg.src = 'img/prize1.png';
+      
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start';
+      callback();
+    }
+  }
+  
+  checkAllLoaded();
+}
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -482,15 +538,21 @@ function spawnObstacle(y) {
   // Obstacles are moving horizontally
   const size = 210; // 3x bigger
   const speed = 1.5 + Math.random() * 1.5;
-  const leftToRight = Math.random() > 0.5;
   // Always pick a random enemy type
   let enemyType = Math.random() > 0.5 ? 1 : 0;
+  // Always move toward center
+  let spawnLeft = Math.random() > 0.5;
+  let centerX = canvas.width / 2;
+  let x = spawnLeft ? -size : canvas.width + size;
+  let moveSpeed = spawnLeft ? speed : -speed;
+  // If spawning left, move right; if spawning right, move left
+  if ((spawnLeft && x > centerX) || (!spawnLeft && x < centerX)) moveSpeed *= -1;
   obstacles.push({
-    x: leftToRight ? -size : canvas.width + size,
+    x,
     y,
     size,
-    speed: leftToRight ? speed : -speed,
-    leftToRight,
+    speed: moveSpeed,
+    leftToRight: moveSpeed > 0,
     enemyType
   });
 }
@@ -533,22 +595,17 @@ canvas.addEventListener('mousemove', function(e) {
   mouseX = e.clientX;
 });
 
-function drawPlayer(x, y, jumping, dead = false) {
-  context.save();
-  context.translate(x + doodle.width/2, y + doodle.height/2);
-  // Bouncing animation: scale up when jumping, squish when landing
-  let scaleY = 1, scaleX = 1;
+function drawPlayer(x, y, dead = false) {
+  playerImg.style.left = x + 'px';
+  playerImg.style.top = y + 'px';
+  playerImg.style.width = doodle.width + 'px';
+  playerImg.style.height = doodle.height + 'px';
+  
+  let transform = '';
   if (dead) {
-    context.rotate(Math.PI/2 * Math.min(1, deathAnim/20));
-    scaleY = 0.7; scaleX = 1.2;
-  } else if (jumping) {
-    scaleY = 1.15; scaleX = 0.9;
-  } else if (doodle.dy > 6) { // landing
-    scaleY = 0.85; scaleX = 1.15;
+    transform = `rotate(${Math.PI/2 * Math.min(1, deathAnim/20)}rad) scale(1.2, 0.7)`;
   }
-  context.scale(scaleX, scaleY);
-  context.drawImage(playerImg, -doodle.width/2, -doodle.height/2, doodle.width, doodle.height);
-  context.restore();
+  playerImg.style.transform = transform;
 }
 
 function loop() {
@@ -630,8 +687,11 @@ function loop() {
       let lastType = prevPlat.type || 'normal';
       let canBeFragile = lastType !== 'fragile';
       let r = Math.random();
-      if (canBeFragile && r < 0.4) type = 'fragile'; // 40% chance fragile
-      else if (r < 0.55) type = 'moving'; // 15% chance moving
+      let fragileChance = 0.4;
+      let movingChance = 0.15;
+      if (score > 500) { fragileChance = 0.6; movingChance = 0.2; }
+      if (canBeFragile && r < fragileChance) type = 'fragile';
+      else if (r < fragileChance + movingChance) type = 'moving';
     }
     let enemyOffsetY = 0;
     if (type === 'fragile') {
@@ -753,13 +813,13 @@ function loop() {
 
   if (dying) {
     deathAnim++;
-    drawPlayer(doodle.x, doodle.y, false, true);
+    drawPlayer(doodle.x, doodle.y, true);
     doodle.y += 10 + deathAnim*0.7;
     if (doodle.y > canvas.height + 80) {
       showGameOver();
     }
   } else {
-    drawPlayer(doodle.x, doodle.y, doodle.dy < 0);
+    drawPlayer(doodle.x, doodle.y);
   }
 
   prevDoodleY = doodle.y;
@@ -782,6 +842,7 @@ function loop() {
 
 function showGameOver() {
   running = false;
+  playerImg.style.display = 'none';
   finalScore.textContent = score;
   if (score > highscore) {
     highscore = score;
@@ -795,6 +856,7 @@ function showGameOver() {
 
 okBtn.onclick = function() {
   gameOverModal.classList.remove('active');
+  playerImg.style.display = 'block';
   resetGame();
   setTimeout(() => {
     running = true;
@@ -805,6 +867,7 @@ okBtn.onclick = function() {
 homeBtn.onclick = function() {
   gameOverModal.classList.remove('active');
   document.querySelectorAll('.doodle-img').forEach(img => img.style.display = '' );
+  playerImg.style.display = 'none';
   startModal.classList.add('active');
   rocketFlying = true;
   rocketContainer.style.display = '';
@@ -812,16 +875,19 @@ homeBtn.onclick = function() {
   resetGame();
 };
 
-startBtn.onclick = function() {
+function startGame() {
   startModal.classList.remove('active');
   document.querySelectorAll('.doodle-img').forEach(img => img.style.display = 'none');
   rocketFlying = false;
   rocketContainer.style.display = 'none';
   clearTimeout(rocketTimeout);
+  playerImg.style.display = 'block';
   resetGame();
   running = true;
   requestAnimationFrame(loop);
-};
+}
+
+startBtn.onclick = startGame;
 
 function randomRocketPos() {
   // Keep rocket within 10vw-70vw and 10vh-60vh
@@ -849,6 +915,7 @@ if (startModal.classList.contains('active')) {
 
 // Start with modal
 resetGame();
+preloadImages(() => {}); // Preload images on page load
 </script>
 </body>
 </html>
