@@ -495,6 +495,7 @@ function createInitialPlatforms() {
     }
     platforms.push({
       x, y, type, broken: false, crackAnim: 0, color: randomPlatformColor(type), moveDir, moveRange, moveBase, blobSeed: Math.random(),
+      bounceAnim: 0,
       cloudIdx,
       width: cloudType.width,
       height: cloudType.height,
@@ -511,6 +512,7 @@ function createInitialPlatforms() {
     broken: false,
     crackAnim: 0,
     color: randomPlatformColor('normal'),
+    bounceAnim: 0,
     moveDir: 0,
     moveRange: 0,
     moveBase: 0,
@@ -656,6 +658,7 @@ function loop() {
       broken: false,
       crackAnim: 0,
       color: randomPlatformColor('normal'),
+      bounceAnim: 0,
       cloudIdx,
       width: cloudType.width,
       height: cloudType.height,
@@ -704,6 +707,7 @@ function loop() {
       broken: false,
       crackAnim: 0,
       color: randomPlatformColor(type),
+      bounceAnim: 0,
       cloudIdx,
       width: cloudType.width,
       height: cloudType.height,
@@ -731,33 +735,74 @@ function loop() {
 
   // Draw platforms
   platforms.forEach(platform => {
+    let bounceOffset = 0;
+    let width = platform.width;
+    let height = platform.height;
+    let x = platform.x;
+
+    if (platform.bounceAnim > 0) {
+      const totalFrames = 30; // 0.5s at 60fps
+      const frame = totalFrames - platform.bounceAnim;
+      const progress = frame / totalFrames;
+
+      // Keyframe animation for bounceOffset
+      if (progress < 0.3) {
+        const p = progress / 0.3;
+        bounceOffset = 15 * p;
+      } else if (progress < 0.6) {
+        const p = (progress - 0.3) / 0.3;
+        bounceOffset = 15 - 20 * p;
+      } else {
+        const p = (progress - 0.6) / 0.4;
+        bounceOffset = -5 + 5 * p;
+      }
+
+      // Shape morphing: stretch and squash (flatten)
+      const maxDeformation = 0.40; // Max 40% deformation
+      if (bounceOffset > 0) { // Stretching up
+        const stretch = (bounceOffset / 15) * maxDeformation;
+        width = platform.width * (1 - stretch);
+        height = platform.height * (1 + stretch);
+      } else { // Squashing down
+        const squash = (bounceOffset / -5) * maxDeformation;
+        width = platform.width * (1 + squash);
+        height = platform.height * (1 - squash);
+      }
+      x = platform.x + (platform.width - width) / 2; // Keep centered
+
+      platform.bounceAnim--;
+    }
+    const y = platform.y - bounceOffset;
+
     context.save();
     if (platform.type === 'moving' && !platform.broken) {
       let t = Date.now() / 900;
       platform.x = platform.moveBase + Math.sin(t * platform.moveDir) * platform.moveRange;
+      // if moving, we need to update the base x for our calculation
+      x = platform.x + (platform.width - width) / 2;
     }
-    // Draw cloud image for all platforms (no filter)
+    // Draw cloud image for all platforms
     const img = cloudImgs[platform.cloudIdx] || cloudImgs[0];
     context.globalAlpha = platform.type === 'fragile' && platform.broken ? 0.5 : 1;
-    context.drawImage(img, platform.x, platform.y, platform.width, platform.height);
-    // Light grey overlay for cloud look (no border)
+    context.drawImage(img, x, y, width, height);
+    // Light grey overlay for cloud look
     context.save();
     context.globalAlpha = 0.18;
     context.globalCompositeOperation = 'source-atop';
     context.fillStyle = '#bbb';
-    context.fillRect(platform.x, platform.y, platform.width, platform.height);
+    context.fillRect(x, y, width, height);
     context.globalAlpha = 1;
     context.globalCompositeOperation = 'source-over';
     context.restore();
     // Fragile overlay
     if (platform.type === 'fragile') {
-      const enemyW = platform.width * 0.9;
-      const enemyH = platform.height * 1.5;
+      const enemyW = width * 0.9;
+      const enemyH = height * 1.5;
       const offsetY = platform.enemyOffsetY || 0;
       // Bobbing animation for platform enemy
       const t = Date.now() / 600;
       const bob = Math.sin(t + platform.x/100) * 12;
-      context.drawImage(platformEnemyImg, platform.x + (platform.width-enemyW)/2, platform.y + offsetY + bob, enemyW, enemyH);
+      context.drawImage(platformEnemyImg, x + (width-enemyW)/2, y + offsetY + bob, enemyW, enemyH);
     }
     context.restore();
   });
@@ -787,6 +832,7 @@ function loop() {
           doodle.y = platform.y - doodle.height;
           doodle.dy = bounceVelocity;
           // Increment score only when landing
+          platform.bounceAnim = 30; // Start 0.5s animation
           score += 10;
           scoreDisplay.textContent = 'Score: ' + score;
         }
